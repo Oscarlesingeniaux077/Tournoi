@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Score Eurobot 2026 - Admin / Utilisateur</title>
+  <style>
+    :root {
+      --blue: rgb(0, 91, 140);
+      --yellow: rgb(247, 181, 0);
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --border: #d0d7de;
+      --text: #1f2937;
+      --danger: #b91c1c;
+      --ok: #166534;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background: #111827;
+      color: white;
+      padding: 18px 24px;
+    }
+
+    header h1 { margin: 0 0 6px; font-size: 22px; }
+    header p { margin: 0; opacity: 0.85; }
+
+    nav {
+      display: flex;
+      gap: 10px;
+      padding: 16px 24px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: white;
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    button.active { background: #111827; color: white; }
+    button.danger { color: var(--danger); border-color: #fecaca; }
+    button.ok { color: var(--ok); border-color: #bbf7d0; }
+
+    main {
+      padding: 24px;
+      max-width: 1350px;
+      margin: auto;
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 18px;
+    }
+
+    h2, h3 { margin-top: 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      overflow: hidden;
+      border-radius: 10px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    th { background: #eef2f7; }
+
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .team-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .score-box {
+      min-width: 72px;
+      text-align: center;
+      font-size: 30px;
+      font-weight: 800;
+      padding: 8px 14px;
+      border-radius: 8px;
+      color: white;
+      background: #111827;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 95px 90px 75px;
+      gap: 10px;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid #edf0f2;
+    }
+
+    .action-row:last-child { border-bottom: 0; }
+    .action-row label { font-size: 14px; }
+
+    .readonly-value {
+      padding: 7px;
+      background: #f9fafb;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .winner { font-weight: 800; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .small { font-size: 12px; }
+
+    @media (max-width: 760px) {
+      main { padding: 14px; }
+      .action-row { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; padding: 7px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tournoi des Robot Maker !</h1>
+    <p>Un seul fichier HTML : admin, utilisateur, équipes multiples, couleurs de match indépendantes et calcul automatique.</p>
+  </header>
+
+  <nav>
+    <button id="adminBtn" class="active" onclick="showPanel('admin')">Interface admin</button>
+    <button id="userBtn" onclick="showPanel('user')">Interface utilisateur</button>
+    <button onclick="saveData()">Sauvegarder</button>
+    <button class="danger" onclick="resetData()">Réinitialiser</button>
+  </nav>
+
+  <main>
+    <section id="admin" class="panel active">
+      <div class="card">
+        <h2>Gestion des équipes</h2>
+        <div class="row">
+          <input id="newTeamName" type="text" placeholder="Nom de l'équipe" />
+          <button class="ok" onclick="addTeam()">Ajouter une équipe</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Équipe</th>
+              <th>Total tournoi</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="adminTeamsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Gestion des matchs</h2>
+        <div class="row">
+          <button class="ok" onclick="addMatch()">Ajouter un match</button>
+        </div>
+        <p class="muted">Chaque match contient deux équipes. Les scores se calculent depuis la feuille de comptage de chaque équipe.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Équipe</th>
+              <th>Couleur match</th>
+              <th>Score</th>
+              <th>Adversaire</th>
+              <th>Couleur match</th>
+              <th>Score adversaire</th>
+              <th>Gagnant</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="adminMatchesBody"></tbody>
+        </table>
+      </div>
+
+      <div id="scoreSheets"></div>
+    </section>
+
+    <section id="user" class="panel">
+      <div class="card">
+        <h2>Tableau utilisateur</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Équipe</th>
+              <th>Couleur</th>
+              <th>Score</th>
+              <th>Adversaire</th>
+              <th>Couleur</th>
+              <th>Score</th>
+              <th>Gagnant</th>
+            </tr>
+          </thead>
+          <tbody id="userMatchesBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Classement général</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Rang</th>
+              <th>Équipe</th>
+              <th>Total points</th>
+              <th>Victoires</th>
+              <th>Égalités</th>
+              <th>Défaites</th>
+            </tr>
+          </thead>
+          <tbody id="rankingBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const actions = [
+      { label: "Caisse de noisettes dans le nid", points: 2 },
+      { label: "Caisse de noisettes valide dans un garde-manger", points: 3 },
+      { label: "Bonus de zone garde-manger", points: 5 },
+      { label: "Frigo vide de caisses de noisettes", points: 2 },
+      { label: "Frigo plein de caisses vides", points: 5 },
+      { label: "Thermomètre", points: 1, thermo: true },
+      { label: "Robot partiellement dans son aire d’arrivée", points: 5 },
+      { label: "Robot complètement dans son aire d’arrivée", points: 10 },
+      { label: "Garde-manger occupé par l’équipe", points: 5 },
+      { label: "Tous les PAMI mangent des noisettes", points: 10 }
+    ];
+
+    let teams = [
+      { id: crypto.randomUUID(), name: "Équipe 1" },
+      { id: crypto.randomUUID(), name: "Équipe 2" }
+    ];
+
+    let matches = [];
+
+    function showPanel(panel) {
+      document.getElementById("admin").classList.toggle("active", panel === "admin");
+      document.getElementById("user").classList.toggle("active", panel === "user");
+      document.getElementById("adminBtn").classList.toggle("active", panel === "admin");
+      document.getElementById("userBtn").classList.toggle("active", panel === "user");
+    }
+
+    function addTeam() {
+      const nameInput = document.getElementById("newTeamName");
+      const name = nameInput.value.trim();
+      if (!name) return alert("Indiquer un nom d'équipe.");
+      teams.push({ id: crypto.randomUUID(), name });
+      nameInput.value = "";
+      renderAll();
+    }
+
+    function removeTeam(teamId) {
+      if (!confirm("Supprimer cette équipe et ses feuilles de match ?")) return;
+      teams = teams.filter(t => t.id !== teamId);
+      matches = matches.filter(m => m.teamA !== teamId && m.teamB !== teamId);
+      renderAll();
+    }
+
+    function updateTeam(teamId, field, value) {
+      const team = teams.find(t => t.id === teamId);
+      if (!team) return;
+      team[field] = value;
+      renderAll();
+    }
+
+    function addMatch() {
+      if (teams.length < 2) return alert("Ajouter au moins deux équipes.");
+      matches.push({
+        id: crypto.randomUUID(),
+        teamA: teams[0].id,
+        teamB: teams[1].id,
+        colorA: "blue",
+        colorB: "yellow",
+        scores: {}
+      });
+      renderAll();
+    }
+
+    function removeMatch(matchId) {
+      matches = matches.filter(m => m.id !== matchId);
+      renderAll();
+    }
+
+    function updateMatchTeam(matchId, field, teamId) {
+      const match = matches.find(m => m.id === matchId);
+      if (!match) return;
+      match[field] = teamId;
+      if (match.teamA === match.teamB && teams.length > 1) {
+        const other = teams.find(t => t.id !== teamId);
+        if (other) match[field === "teamA" ? "teamB" : "teamA"] = other.id;
+      }
+      renderAll();
+    }
+
+    function getTeam(teamId) {
+      return teams.find(t => t.id === teamId) || { id: "", name: "Équipe supprimée" };
+    }
+
+    function getScore(match, teamId) {
+      const scoreData = match.scores[teamId] || {};
+      return actions.reduce((sum, action, i) => {
+        const quantity = Number(scoreData[i] || 0);
+        return sum + quantity * action.points;
+      }, 0);
+    }
+
+    function updateActionQuantity(matchId, teamId, actionIndex, value) {
+      const match = matches.find(m => m.id === matchId);
+      if (!match) return;
+      if (!match.scores[teamId]) match.scores[teamId] = {};
+
+      const action = actions[actionIndex];
+      let numberValue = Math.max(0, Number(value || 0));
+      if (action && action.thermo) numberValue = Math.min(5, numberValue);
+
+      match.scores[teamId][actionIndex] = numberValue;
+      renderAll();
+    }
+
+    function getWinner(scoreA, scoreB, teamA, teamB) {
+      if (scoreA > scoreB) return teamA.name;
+      if (scoreB > scoreA) return teamB.name;
+      return "Égalité";
+    }
+
+    function teamOptions(selectedId) {
+      return teams.map(t => `<option value="${t.id}" ${t.id === selectedId ? "selected" : ""}>${escapeHtml(t.name)}</option>`).join("");
+    }
+
+    function renderAdminTeams() {
+      const tbody = document.getElementById("adminTeamsBody");
+      tbody.innerHTML = "";
+      teams.forEach(team => {
+        const total = matches.reduce((sum, m) => sum + getScore(m, team.id), 0);
+        tbody.innerHTML += `
+          <tr>
+            <td><input type="text" value="${escapeHtml(team.name)}" onchange="updateTeam('${team.id}', 'name', this.value)"></td>
+            <td><strong>${total}</strong></td>
+            <td><button class="danger" onclick="removeTeam('${team.id}')">Supprimer</button></td>
+          </tr>`;
+      });
+    }
+
+    function renderMatches() {
+      const adminBody = document.getElementById("adminMatchesBody");
+      const userBody = document.getElementById("userMatchesBody");
+      adminBody.innerHTML = "";
+      userBody.innerHTML = "";
+
+      matches.forEach(match => {
+        const teamA = getTeam(match.teamA);
+        const teamB = getTeam(match.teamB);
+        const scoreA = getScore(match, teamA.id);
+        const scoreB = getScore(match, teamB.id);
+        const winner = getWinner(scoreA, scoreB, teamA, teamB);
+
+        adminBody.innerHTML += `
+          <tr>
+            <td><select onchange="updateMatchTeam('${match.id}', 'teamA', this.value)">${teamOptions(teamA.id)}</select></td>
+            <td>${matchColorSelect(match.id, 'colorA', match.colorA)}</td>
+            <td>${scoreA}</td>
+            <td><select onchange="updateMatchTeam('${match.id}', 'teamB', this.value)">${teamOptions(teamB.id)}</select></td>
+            <td>${matchColorSelect(match.id, 'colorB', match.colorB)}</td>
+            <td>${scoreB}</td>
+            <td class="winner">${escapeHtml(winner)}</td>
+            <td><button class="danger" onclick="removeMatch('${match.id}')">Supprimer</button></td>
+          </tr>`;
+
+        userBody.innerHTML += `
+          <tr>
+            <td>${badge(teamA, match.colorA)}</td>
+            <td>${colorLabel(match.colorA)}</td>
+            <td>${scoreA}</td>
+            <td>${badge(teamB, match.colorB)}</td>
+            <td>${colorLabel(match.colorB)}</td>
+            <td>${scoreB}</td>
+            <td class="winner">${escapeHtml(winner)}</td>
+          </tr>`;
+      });
+    }
+
+    function renderScoreSheets() {
+      const container = document.getElementById("scoreSheets");
+      container.innerHTML = "";
+
+      matches.forEach((match, matchIndex) => {
+        const teamA = getTeam(match.teamA);
+        const teamB = getTeam(match.teamB);
+        container.innerHTML += `
+          <div class="grid">
+            ${scoreSheetHtml(match, teamA, matchIndex + 1, match.colorA)}
+            ${scoreSheetHtml(match, teamB, matchIndex + 1, match.colorB)}
+          </div>`;
+      });
+    }
+
+    function scoreSheetHtml(match, team, number, matchColor) {
+      const score = getScore(match, team.id);
+      const rows = actions.map((action, index) => {
+        const quantity = (match.scores[team.id] && match.scores[team.id][index]) || 0;
+
+        if (action.thermo) {
+          return `
+            <div class="action-row">
+              <label>${escapeHtml(action.label)}</label>
+              <div class="readonly-value">0 à 5 pts</div>
+              <input type="number" min="0" max="5" value="${quantity}" onchange="updateActionQuantity('${match.id}', '${team.id}', ${index}, this.value)">
+              <div class="readonly-value">${quantity}</div>
+            </div>`;
+        }
+
+        return `
+          <div class="action-row">
+            <label>${escapeHtml(action.label)}</label>
+            <div class="readonly-value">${action.points} pt</div>
+            <input type="number" min="0" value="${quantity}" onchange="updateActionQuantity('${match.id}', '${team.id}', ${index}, this.value)">
+            <div class="readonly-value">${quantity * action.points}</div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="card">
+          <div class="team-title">
+            <h2>Match ${number} - ${badge(team, matchColor)}</h2>
+            <div class="score-box" style="background:${getMatchColorHex(matchColor)};">${score}</div>
+          </div>
+          <p class="muted">Colonnes : action, valeur unitaire, quantité validée, sous-total.</p>
+          ${rows}
+        </div>`;
+    }
+
+    function renderRanking() {
+      const data = teams.map(team => ({
+        ...team,
+        points: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0
+      }));
+
+      matches.forEach(match => {
+        const a = data.find(t => t.id === match.teamA);
+        const b = data.find(t => t.id === match.teamB);
+        if (!a || !b) return;
+        const scoreA = getScore(match, a.id);
+        const scoreB = getScore(match, b.id);
+        a.points += scoreA;
+        b.points += scoreB;
+        if (scoreA > scoreB) { a.wins++; b.losses++; }
+        else if (scoreB > scoreA) { b.wins++; a.losses++; }
+        else { a.draws++; b.draws++; }
+      });
+
+      data.sort((a, b) => b.wins - a.wins || b.points - a.points || a.losses - b.losses || a.name.localeCompare(b.name));
+
+      const tbody = document.getElementById("rankingBody");
+      tbody.innerHTML = data.map((team, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(team.name)}</td>
+          <td><strong>${team.points}</strong></td>
+          <td>${team.wins}</td>
+          <td>${team.draws}</td>
+          <td>${team.losses}</td>
+        </tr>`).join("");
+    }
+
+    function badge(team, matchColor) {
+      const hex = getMatchColorHex(matchColor);
+      return `<span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:14px;height:14px;border-radius:50%;background:${hex};display:inline-block;border:1px solid #999;"></span>${escapeHtml(team.name)}</span>`;
+    }
+
+    function getMatchColorHex(matchColor) {
+      if (matchColor === "blue") return "#005b8c";
+      if (matchColor === "yellow") return "#f7b500";
+      return "#6b7280";
+    }
+
+    function colorLabel(matchColor) {
+      if (matchColor === "blue") return "Bleu";
+      if (matchColor === "yellow") return "Jaune";
+      return "Neutre";
+    }
+
+    function matchColorSelect(matchId, field, selected) {
+      return `
+        <select onchange="updateMatchColor('${matchId}', '${field}', this.value)">
+          <option value="blue" ${selected === "blue" ? "selected" : ""}>Bleu</option>
+          <option value="yellow" ${selected === "yellow" ? "selected" : ""}>Jaune</option>
+          <option value="neutral" ${selected === "neutral" ? "selected" : ""}>Neutre</option>
+        </select>`;
+    }
+
+    function updateMatchColor(matchId, field, value) {
+      const match = matches.find(m => m.id === matchId);
+      if (!match) return;
+      match[field] = value;
+      renderAll();
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>'"]/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[c]));
+    }
+
+    function saveData() {
+      localStorage.setItem("eurobot-score-data", JSON.stringify({ teams, matches }));
+      alert("Données sauvegardées dans le navigateur.");
+    }
+
+    function loadData() {
+      const raw = localStorage.getItem("eurobot-score-data");
+      if (!raw) return alert("Aucune sauvegarde trouvée.");
+      const data = JSON.parse(raw);
+      teams = data.teams || teams;
+      matches = data.matches || [];
+      renderAll();
+    }
+
+    function resetData() {
+      if (!confirm("Effacer toutes les données ?")) return;
+      localStorage.removeItem("eurobot-score-data");
+      matches = [];
+      teams = [
+        { id: crypto.randomUUID(), name: "Équipe 1" },
+        { id: crypto.randomUUID(), name: "Équipe 2" }
+      ];
+      renderAll();
+    }
+
+    function renderAll() {
+      renderAdminTeams();
+      renderMatches();
+      renderScoreSheets();
+      renderRanking();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
