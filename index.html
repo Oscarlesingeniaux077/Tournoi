@@ -55,6 +55,14 @@
     button.active { background: #111827; color: white; }
     button.danger { color: var(--danger); border-color: #fecaca; }
     button.ok { color: var(--ok); border-color: #bbf7d0; }
+    .sync-status {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #f9fafb;
+      font-size: 13px;
+      color: #374151;
+    }
 
     main {
       padding: 24px;
@@ -176,8 +184,10 @@
   <nav>
     <button id="adminBtn" class="active" onclick="showPanel('admin')">Interface admin</button>
     <button id="userBtn" onclick="showPanel('user')">Interface utilisateur</button>
-    <button onclick="saveData()">Sauvegarder</button>
-    <button class="danger" onclick="resetData()">Réinitialiser</button>
+    <button onclick="saveData()">Sauvegarder pour tous</button>
+    <button onclick="loadData()">Recharger depuis le cloud</button>
+    <button class="danger" onclick="resetData()">Réinitialiser pour tous</button>
+    <span id="syncStatus" class="sync-status">Synchronisation non initialisée</span>
   </nav>
 
   <main>
@@ -264,7 +274,69 @@
     </section>
   </main>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+
   <script>
+    /*
+      IMPORTANT : localStorage ne permet pas le partage entre appareils.
+      Pour que tous les utilisateurs voient les modifications, ce fichier utilise Firebase Realtime Database.
+
+      Étapes :
+      1) Créer un projet Firebase.
+      2) Activer Realtime Database.
+      3) Remplacer les valeurs ci-dessous par la configuration Web du projet.
+      4) Héberger ce fichier sur un site accessible par tous les appareils.
+    */
+    const firebaseConfig = {
+      apiKey: "A_COMPLETER",
+      authDomain: "A_COMPLETER.firebaseapp.com",
+      databaseURL: "https://A_COMPLETER-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "A_COMPLETER",
+      storageBucket: "A_COMPLETER.appspot.com",
+      messagingSenderId: "A_COMPLETER",
+      appId: "A_COMPLETER"
+    };
+
+    const DATA_PATH = "eurobot-2026/scoreboard";
+    let database = null;
+    let sharedStorageReady = false;
+
+    function setSyncStatus(message) {
+      const el = document.getElementById("syncStatus");
+      if (el) el.textContent = message;
+    }
+
+    function initSharedStorage() {
+      if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "A_COMPLETER") {
+        setSyncStatus("Configuration Firebase à compléter");
+        return;
+      }
+
+      try {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        sharedStorageReady = true;
+        setSyncStatus("Connecté au stockage partagé");
+
+        database.ref(DATA_PATH).on("value", snapshot => {
+          const data = snapshot.val();
+          if (!data) return;
+          teams = Array.isArray(data.teams) ? data.teams : teams;
+          matches = Array.isArray(data.matches) ? data.matches : [];
+          renderAll();
+          const date = data.updatedAt ? new Date(data.updatedAt).toLocaleString("fr-FR") : "instant inconnu";
+          setSyncStatus("Données synchronisées : " + date);
+        }, error => {
+          console.error(error);
+          setSyncStatus("Erreur de synchronisation Firebase");
+        });
+      } catch (error) {
+        console.error(error);
+        setSyncStatus("Erreur d'initialisation Firebase");
+      }
+    }
+
     const actions = [
       { label: "Caisse de noisettes dans le nid", points: 2 },
       { label: "Caisse de noisettes valide dans un garde-manger", points: 3 },
@@ -556,29 +628,68 @@
       }[c]));
     }
 
-    function saveData() {
-      localStorage.setItem("eurobot-score-data", JSON.stringify({ teams, matches }));
-      alert("Données sauvegardées dans le navigateur.");
+    async function saveData() {
+      if (!sharedStorageReady || !database) {
+        alert("Firebase n'est pas configuré. Les données ne peuvent pas encore être partagées entre appareils.");
+        return;
+      }
+
+      const payload = {
+        teams,
+        matches,
+        updatedAt: Date.now()
+      };
+
+      try {
+        await database.ref(DATA_PATH).set(payload);
+        setSyncStatus("Données sauvegardées pour tous les appareils");
+      } catch (error) {
+        console.error(error);
+        alert("Erreur pendant la sauvegarde partagée.");
+      }
     }
 
-    function loadData() {
-      const raw = localStorage.getItem("eurobot-score-data");
-      if (!raw) return alert("Aucune sauvegarde trouvée.");
-      const data = JSON.parse(raw);
-      teams = data.teams || teams;
-      matches = data.matches || [];
-      renderAll();
+    async function loadData() {
+      if (!sharedStorageReady || !database) {
+        alert("Firebase n'est pas configuré. Impossible de charger les données partagées.");
+        return;
+      }
+
+      try {
+        const snapshot = await database.ref(DATA_PATH).get();
+        const data = snapshot.val();
+        if (!data) return alert("Aucune donnée partagée trouvée.");
+        teams = Array.isArray(data.teams) ? data.teams : teams;
+        matches = Array.isArray(data.matches) ? data.matches : [];
+        renderAll();
+        setSyncStatus("Données rechargées depuis le stockage partagé");
+      } catch (error) {
+        console.error(error);
+        alert("Erreur pendant le chargement des données partagées.");
+      }
     }
 
-    function resetData() {
-      if (!confirm("Effacer toutes les données ?")) return;
-      localStorage.removeItem("eurobot-score-data");
+    async function resetData() {
+      if (!confirm("Effacer toutes les données pour tous les appareils ?")) return;
+
       matches = [];
       teams = [
         { id: crypto.randomUUID(), name: "Équipe 1" },
         { id: crypto.randomUUID(), name: "Équipe 2" }
       ];
       renderAll();
+
+      if (sharedStorageReady && database) {
+        try {
+          await database.ref(DATA_PATH).set({ teams, matches, updatedAt: Date.now() });
+          setSyncStatus("Données réinitialisées pour tous les appareils");
+        } catch (error) {
+          console.error(error);
+          alert("Réinitialisation locale effectuée, mais erreur pendant la synchronisation partagée.");
+        }
+      } else {
+        setSyncStatus("Réinitialisation locale seulement : Firebase non configuré");
+      }
     }
 
     function renderAll() {
@@ -589,6 +700,7 @@
     }
 
     renderAll();
+    initSharedStorage();
   </script>
 </body>
 </html>
